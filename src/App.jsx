@@ -1,4 +1,3 @@
-// App.jsx - Improved Version
 import React, { useState } from 'react';
 import { Container } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -6,14 +5,15 @@ import './App.css';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import SignUp from './Signup';
+import ForgotPassword from './Forgot';
 import { UserProvider, useUser } from './UserContext';
 import employeeAPI from './Api';
 
-// Views constants to avoid magic strings
 const VIEWS = {
   LOGIN: 'login',
   SIGNUP: 'signup',
   DASHBOARD: 'dashboard',
+  FORGOT_PASSWORD: 'forgot_password',
 };
 
 const AppContent = () => {
@@ -36,7 +36,6 @@ const AppContent = () => {
       setView(VIEWS.DASHBOARD);
     } catch (error) {
       setError(error.message || 'Login failed. Please check your credentials.');
-      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
@@ -47,15 +46,9 @@ const AppContent = () => {
     setView(VIEWS.LOGIN);
   };
 
-  const showSignUp = () => {
-    setError('');
-    setView(VIEWS.SIGNUP);
-  };
-
-  const showLogin = () => {
-    setError('');
-    setView(VIEWS.LOGIN);
-  };
+  const showSignUp = () => { setError(''); setView(VIEWS.SIGNUP); };
+  const showLogin = () => { setError(''); setView(VIEWS.LOGIN); };
+  const showForgotPassword = () => { setError(''); setView(VIEWS.FORGOT_PASSWORD); };
 
   return (
     <Container
@@ -70,6 +63,7 @@ const AppContent = () => {
         <Login
           onLogin={handleLogin}
           onSignUpClick={showSignUp}
+          onForgotPasswordClick={showForgotPassword}
           loading={loading}
           error={error}
         />
@@ -77,6 +71,10 @@ const AppContent = () => {
 
       {view === VIEWS.SIGNUP && (
         <SignUp onBackToLogin={showLogin} />
+      )}
+
+      {view === VIEWS.FORGOT_PASSWORD && (
+        <ForgotPassword onBackToLogin={showLogin} />
       )}
     </Container>
   );
