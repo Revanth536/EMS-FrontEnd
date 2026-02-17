@@ -1,96 +1,91 @@
+import React, { useState } from 'react';
+import { Container } from 'react-bootstrap';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './App.css';
+import Login from './Login';
+import Dashboard from './Dashboard';
+import SignUp from './Signup';
+import ForgotPassword from './Forgot';
+import { UserProvider, useUser } from './UserContext';
+import employeeAPI from './Api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const VIEWS = {
+  LOGIN: 'login',
+  SIGNUP: 'signup',
+  DASHBOARD: 'dashboard',
+  FORGOT_PASSWORD: 'forgot_password',
+};
 
-class EmployeeAPI {
-  async handleResponse(response) {
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || `HTTP Error: ${response.status}`);
-    }
-    return response.json();
-  }
+const AppContent = () => {
+  const { currentUser, login, logout } = useUser();
+  const [view, setView] = useState(currentUser ? VIEWS.DASHBOARD : VIEWS.LOGIN);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  async getAllEmployees() {
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const email = e.target.formBasicEmail.value;
+    const password = e.target.formBasicPassword.value;
+
     try {
-      const response = await fetch(`${API_BASE_URL}/employees`);
-      return this.handleResponse(response);
+      const user = await employeeAPI.login(email, password);
+      login(user);
+      setView(VIEWS.DASHBOARD);
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      throw error;
+      setError(error.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  async createEmployee(employeeData) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/employees`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          firstName: employeeData.firstName,
-          email: employeeData.email,
-          password: employeeData.password, // Now includes password
-        }),
-      });
-      return this.handleResponse(response);
-    } catch (error) {
-      console.error('Error creating employee:', error);
-      throw error;
-    }
-  }
+  const handleLogout = () => {
+    logout();
+    setView(VIEWS.LOGIN);
+  };
 
-  async login(email, password) {
-    try {
-      // Use dedicated login endpoint
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+  const showSignUp = () => { setError(''); setView(VIEWS.SIGNUP); };
+  const showLogin = () => { setError(''); setView(VIEWS.LOGIN); };
+  const showForgotPassword = () => { setError(''); setView(VIEWS.FORGOT_PASSWORD); };
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid email or password');
-        }
-        throw new Error('Login failed. Please try again.');
-      }
+  return (
+    <Container
+      className="d-flex justify-content-center align-items-center"
+      style={{ minHeight: '100vh' }}
+    >
+      {view === VIEWS.DASHBOARD && (
+        <Dashboard onLogout={handleLogout} currentUser={currentUser} />
+      )}
 
-      return this.handleResponse(response);
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  }
+      {view === VIEWS.LOGIN && (
+        <Login
+          onLogin={handleLogin}
+          onSignUpClick={showSignUp}
+          onForgotPasswordClick={showForgotPassword}
+          loading={loading}
+          error={error}
+        />
+      )}
 
-  // JWT token management
-  saveToken(token) {
-    localStorage.setItem('authToken', token);
-  }
+      {view === VIEWS.SIGNUP && (
+        <SignUp onBackToLogin={showLogin} />
+      )}
 
-  getToken() {
-    return localStorage.getItem('authToken');
-  }
+      {view === VIEWS.FORGOT_PASSWORD && (
+        <ForgotPassword onBackToLogin={showLogin} />
+      )}
+    </Container>
+  );
+};
 
-  removeToken() {
-    localStorage.removeItem('authToken');
-  }
+const App = () => {
+  return (
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
+  );
+};
 
-  // Add authorization header to requests
-  getAuthHeaders() {
-    const token = this.getToken();
-    return token
-      ? {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        }
-      : {
-          'Content-Type': 'application/json',
-        };
-  }
-}
-
-export const employeeAPI = new EmployeeAPI();
-export default employeeAPI;
+export default App;
