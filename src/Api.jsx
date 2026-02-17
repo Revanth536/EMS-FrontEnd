@@ -1,91 +1,127 @@
-import React, { useState } from 'react';
-import { Container } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
-import Login from './Login';
-import Dashboard from './Dashboard';
-import SignUp from './Signup';
-import ForgotPassword from './Forgot';
-import { UserProvider, useUser } from './UserContext';
-import employeeAPI from './Api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-const VIEWS = {
-  LOGIN: 'login',
-  SIGNUP: 'signup',
-  DASHBOARD: 'dashboard',
-  FORGOT_PASSWORD: 'forgot_password',
-};
-
-const AppContent = () => {
-  const { currentUser, login, logout } = useUser();
-  const [view, setView] = useState(currentUser ? VIEWS.DASHBOARD : VIEWS.LOGIN);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    const email = e.target.formBasicEmail.value;
-    const password = e.target.formBasicPassword.value;
-
-    try {
-      const user = await employeeAPI.login(email, password);
-      login(user);
-      setView(VIEWS.DASHBOARD);
-    } catch (error) {
-      setError(error.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
+class EmployeeAPI {
+  async handleResponse(response) {
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `HTTP Error: ${response.status}`);
     }
-  };
+    return response.json();
+  }
 
-  const handleLogout = () => {
-    logout();
-    setView(VIEWS.LOGIN);
-  };
+  async getAllEmployees() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/employees`);
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      throw error;
+    }
+  }
 
-  const showSignUp = () => { setError(''); setView(VIEWS.SIGNUP); };
-  const showLogin = () => { setError(''); setView(VIEWS.LOGIN); };
-  const showForgotPassword = () => { setError(''); setView(VIEWS.FORGOT_PASSWORD); };
+  async createEmployee(employeeData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/employees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: employeeData.firstName,
+          email: employeeData.email,
+          password: employeeData.password,
+        }),
+      });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error creating employee:", error);
+      throw error;
+    }
+  }
 
-  return (
-    <Container
-      className="d-flex justify-content-center align-items-center"
-      style={{ minHeight: '100vh' }}
-    >
-      {view === VIEWS.DASHBOARD && (
-        <Dashboard onLogout={handleLogout} currentUser={currentUser} />
-      )}
+  async login(email, password) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-      {view === VIEWS.LOGIN && (
-        <Login
-          onLogin={handleLogin}
-          onSignUpClick={showSignUp}
-          onForgotPasswordClick={showForgotPassword}
-          loading={loading}
-          error={error}
-        />
-      )}
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Invalid email or password");
+        }
+        throw new Error("Login failed. Please try again.");
+      }
 
-      {view === VIEWS.SIGNUP && (
-        <SignUp onBackToLogin={showLogin} />
-      )}
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
+    }
+  }
 
-      {view === VIEWS.FORGOT_PASSWORD && (
-        <ForgotPassword onBackToLogin={showLogin} />
-      )}
-    </Container>
-  );
-};
+  async forgotPassword(email) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-const App = () => {
-  return (
-    <UserProvider>
-      <AppContent />
-    </UserProvider>
-  );
-};
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error("No account found with that email address.");
+        }
+        throw new Error("Failed to send reset email. Please try again.");
+      }
 
-export default App;
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      throw error;
+    }
+  }
+
+  async resetPassword(token, newPassword) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, newPassword }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 400) {
+          throw new Error("Reset link is invalid or has expired.");
+        }
+        throw new Error("Failed to reset password. Please try again.");
+      }
+
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Reset password error:", error);
+      throw error;
+    }
+  }
+
+  saveToken(token) {
+    localStorage.setItem("authToken", token);
+  }
+
+  getToken() {
+    return localStorage.getItem("authToken");
+  }
+
+  removeToken() {
+    localStorage.removeItem("authToken");
+  }
+
+  getAuthHeaders() {
+    const token = this.getToken();
+    return token
+      ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+      : { "Content-Type": "application/json" };
+  }
+}
+
+export const employeeAPI = new EmployeeAPI();
+export default employeeAPI;
