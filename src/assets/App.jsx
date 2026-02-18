@@ -5,7 +5,7 @@ import './App.css';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import SignUp from './Signup';
-import ForgotPassword from './Forgot';
+import ForgotPassword from './ForgotPassword';
 import { UserProvider, useUser } from './UserContext';
 import employeeAPI from './Api';
 
